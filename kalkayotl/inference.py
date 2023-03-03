@@ -647,17 +647,12 @@ class Inference:
 		chains=None,cores=None,
 		step=None,
 		file_chains=None,
-		optimize=True,
-		opt_args={
-				"trials":1,
-				"iterations":1000000,
-				"tolerance":1e-2,
-				"tolerance_type":"relative",
-				"plot":True
-				},
+		init_method="advi+adapt_diag",
+		init_iters=int(1e3),
 		prior_predictive=False,
 		posterior_predictive=False,
 		progressbar=True,
+		nuts_backend="pymc",
 		*args,**kwargs):
 		"""
 		Performs the MCMC run.
@@ -668,60 +663,8 @@ class Inference:
 
 		file_chains = self.dir_out+"/chains.nc" if (file_chains is None) else file_chains
 
-		#-------------- ADVI+ADAPT_DIAG ----------------------------------------------------------
-		if optimize:
-			initvals,step = pm.init_nuts(init="advi+adapt_diag",chains=chains,n_init=int(1e3),model=self.Model)
-			print(initvals)
-			# print("Using advi+adapt_diag to optimize the initial solution ...")
-			# trials = []
-			# min_trials = []
-
-			# for i in range(opt_args["trials"]):
-			# 	print("Trial {0}".format(i+1))
-			# 	approx = pm.fit(
-			# 		random_seed=None,
-			# 		n=opt_args["iterations"],
-			# 		method="advi",
-			# 		model=self.Model,
-			# 		callbacks=[pm.callbacks.CheckParametersConvergence(
-			# 					tolerance=opt_args["tolerance"], 
-			# 					diff=opt_args["tolerance_type"])],
-			# 		progressbar=True,
-			# 		obj_optimizer=pm.adagrad_window)
-			# 	trials.append(approx)
-			# 	min_trials.append(np.min(approx.hist))
-
-			# #-------- Best one -----------------
-			# best = trials[np.argmin(min_trials)]
-			# #-----------------------------------
-			
-			# #------------- Plot trials ----------------------------------
-			# if opt_args["plot"]:
-			# 	plt.figure()
-			# 	for i,app in enumerate(trials):
-			# 		plt.plot(app.hist,label="Trial {0}".format(i+1))
-			# 	plt.plot(best.hist,label="Best one")
-			# 	plt.legend()
-			# 	plt.xlabel("Iterations")
-			# 	plt.ylabel("Average Loss")
-			# 	plt.savefig(self.dir_out+"/Initializations.png")
-			# 	plt.close()
-			# #-----------------------------------------------------------
-
-			# #----------- Mean field approximation ------------------------------------
-			# start = best.sample(draws=chains)
-			# start = list(start)
-			# stds = best.bij.rmap(best.std.eval())
-			# cov = self.Model.dict_to_array(stds) ** 2
-			# mean = best.bij.rmap(best.mean.get_value())
-			# mean = self.Model.dict_to_array(mean)
-			# weight = 50
-			# potential = pm.step_methods.hmc.quadpotential.QuadPotentialDiagAdapt(
-			# 									self.Model.ndim, mean, cov, weight)
-			# step = pm.NUTS(potential=potential, model=self.Model, **kwargs)
-			# #------------------------------------------------------------------------
-		else:
-			initvals = None
+		initvals,step = pm.init_nuts(init=init_method, chains=chains, 
+									n_init=init_iters, model=self.Model)
 
 		print("Sampling the model ...")
 
@@ -733,26 +676,31 @@ class Inference:
 			# 	prior = None
 			# #-------------------------------------------------------------
 
-			#---------- Posterior -----------------------
-			trace = pm.sample(draws=sample_iters,
-							initvals=initvals,
-							step=step,
-							tune=tuning_iters,
-							chains=chains, cores=cores,
-							progressbar=progressbar,
-							discard_tuned_samples=True,
-							return_inferencedata=True)
-			# trace = pm.sampling_jax.sample_numpyro_nuts(
-			# 				draws=sample_iters,
-			# 				initvals=start,
-			# 				tune=tuning_iters,
-			# 				chains=chains)
-			# trace = pm.sampling_jax.sample_blackjax_nuts(
-			# 				draws=sample_iters,
-			# 				initvals=initvals,
-			# 				tune=tuning_iters,
-			# 				chains=chains)
-			#-----------------------------------------------
+			#-------------------------- Posterior -----------------------------
+			if nuts_backend == "pymc":
+				trace = pm.sample(draws=sample_iters,
+								initvals=initvals,
+								step=step,
+								tune=tuning_iters,
+								chains=chains, cores=cores,
+								progressbar=progressbar,
+								discard_tuned_samples=True,
+								return_inferencedata=True)
+			elif nuts_backend == "numpyro":
+				trace = pm.sampling_jax.sample_numpyro_nuts(
+								draws=sample_iters,
+								initvals=initvals,
+								tune=tuning_iters,
+								chains=chains)
+			elif nuts_backend == "blackjax":
+				trace = pm.sampling_jax.sample_blackjax_nuts(
+								draws=sample_iters,
+								initvals=initvals,
+								tune=tuning_iters,
+								chains=chains)
+			else:
+				sys.exit("Backend {0} not recognized".format(nuts_backend))
+			#---------------------------------------------------------------
 
 			# #-------- Posterior predictive -----------------------------
 			# if posterior_predictive:
@@ -761,13 +709,13 @@ class Inference:
 			# 	predictive = None
 			# #--------------------------------------------------------
 
-			#--------- Save with arviz ------------
+			#--------- Save with arviz -------------------
 			# pm_data = az.from_pymc3(
 			# 			trace=trace,
 			# 			prior=prior,
 			# 			posterior_predictive=predictive)
 			az.to_netcdf(trace,file_chains)
-			#-------------------------------------
+			#--------------------------------------------
 
 
 	def load_trace(self,file_chains=None):

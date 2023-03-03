@@ -103,9 +103,9 @@ class Model1D(Model):
 
 		elif prior == "Gaussian":
 			if parametrization == "central":
-				pm.Normal("source",mu=self.loc,sd=self.scl,shape=n_sources)
+				pm.Normal("source",mu=self.loc,sigma=self.scl,shape=n_sources)
 			else:
-				pm.Normal("offset",mu=0.0,sd=1.0,shape=n_sources)
+				pm.Normal("offset",mu=0.0,sigma=1.0,shape=n_sources)
 				pm.Deterministic("source",self.loc + self.scl*self.offset)
 
 		elif prior == "StudentT":

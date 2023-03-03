@@ -46,7 +46,7 @@ os.makedirs(dir_base,exist_ok=True)
 
 
 #=============== Tuning knobs ============================
-dimension = 6
+dimension = 1
 #----------------- Chains-----------------------------------------------------
 # The number of parallel chains you want to run. Two are the minimum required
 # to analyse convergence.
@@ -120,6 +120,8 @@ indep_measures = False
 # "constant": models the velocity as expanding or contracting field
 # "linear": models the velocity field as a linear function of position.
 #----------------------------------------------------------------------------------------
+
+nuts_backend = "blackjax"
 #=========================================================================================
 
 #========================= PRIORS ===========================================
@@ -137,8 +139,7 @@ list_of_prior = [
 							},
 		"field_sd":None,
 		"parametrization":"central",
-		"velocity_model":"joint",
-		"optimize":True},
+		"velocity_model":"joint"},
 	# {"type":"StudentT",
 	# 	"dimension":dimension,
 	# 	"zero_point":zero_point[:dimension],
@@ -215,12 +216,13 @@ list_of_prior = [
 for prior in list_of_prior:
 
 	#------ Output directories for each prior -------------------
-	dir_prior = dir_base +  "{0}D_{1}_{2}_{3}_{4}_blackjax".format(
+	dir_prior = dir_base +  "{0}D_{1}_{2}_{3}_{4}_{5}".format(
 		dimension,
 		prior["type"],
 		reference_system,
 		prior["parametrization"],
-		prior["velocity_model"])
+		prior["velocity_model"],
+		nuts_backend)
 	#------------------------------------------------------------
 
 	#---------- Create prior directory -------------
@@ -252,9 +254,9 @@ for prior in list_of_prior:
 	p3d.run(sample_iters=sample_iters,
 			tuning_iters=tuning_iters,
 			target_accept=target_accept,
-			optimize=prior["optimize"],
 			chains=chains,
-			cores=cores)
+			cores=cores,
+			nuts_backend=nuts_backend)
 	#-------------------------------------
 
 	# -------- Load the chains --------------------------------
