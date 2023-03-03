@@ -269,7 +269,9 @@ class Model3D(Model):
 					chol = tt.set_subtensor(chol[i],choli)
 
 			else:
-				sys.exit("Not yet implemented.")
+				for i in range(n_components):
+					choli = np.linalg.cholesky(parameters["scale"][i])
+					chol = tt.set_subtensor(chol[i],choli)
 			#--------------------------------------------------------------------
 		#---------------------------------------------------------------------------------
 
@@ -294,7 +296,7 @@ class Model3D(Model):
 						sd_dist=pm.Gamma.dist(alpha=2.0,beta=1.0/hyper_beta),
 						compute_corr=True)
 			else:
-				sys.exit("Not yet implemented.")
+				chol = np.linalg.cholesky(parameters["scale"])
 			#--------------------------------------------------------------
 		#----------------------------------------------------------------------------
 

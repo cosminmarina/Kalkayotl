@@ -46,7 +46,7 @@ os.makedirs(dir_base,exist_ok=True)
 
 
 #=============== Tuning knobs ============================
-dimension = 1
+dimension = 3
 #----------------- Chains-----------------------------------------------------
 # The number of parallel chains you want to run. Two are the minimum required
 # to analyse convergence.
@@ -129,7 +129,7 @@ list_of_prior = [
 	{"type":"Gaussian",
 		"dimension":dimension,
 		"zero_point":zero_point[:dimension],
-		"parameters":{"location":None,"scale":None},
+		"parameters":{"location":None,"scale":np.diag(np.array([1.0,1.0,1.0]))},
 		"hyper_parameters":{
 							"alpha":None,
 							"beta":None,
@@ -154,8 +154,7 @@ list_of_prior = [
 	# 						},
 	# 	"field_sd":None,
 	# 	"parametrization":"central",
-	# 	"velocity_model":"joint",
-	# 	"optimize":False},
+	# 	"velocity_model":"joint"},
 	# {"type":"FGMM",
 	# 	"dimension":dimension,
 	# 	"zero_point":zero_point[:dimension],        
