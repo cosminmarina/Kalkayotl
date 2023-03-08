@@ -288,14 +288,7 @@ class Model3D(Model):
 		#==============================================================================
 
 		#===================== True values ============================================		
-		if prior == "Gaussian":
-			if parametrization == "central":
-				pm.MvNormal("source",mu=loc,chol=chol,shape=(n_sources,3))
-			else:
-				pm.Normal("offset",mu=0,sigma=1,shape=(n_sources,3))
-				pm.Deterministic("source",loc + tt.nlinalg.matrix_dot(self.offset,chol))
-
-		elif prior in ["GMM","CGMM"]:
+		if prior in ["GMM","CGMM"]:
 			comps = [ pm.MvNormal.dist(mu=loc[i],chol=chol[i]) for i in range(n_components)]
 
 			#---- Sample from the mixture ----------------------------------
