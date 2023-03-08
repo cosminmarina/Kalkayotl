@@ -196,7 +196,7 @@ class Model3D(Model):
 		hyper_nu=None,
 		field_sd=None,
 		transformation=None,
-		reference_system="ICRS",
+		reference_system="Galactic",
 		parametrization="non-central",
 		name="3D", model=None):
 		super().__init__(name, model)
@@ -275,27 +275,7 @@ class Model3D(Model):
 
 		#-------------- Non-mixture prior families ----------------------------------
 		else:
-			#--------- Location ----------------------------------
-			if parameters["location"] is None:
-				location = [ pm.Normal("loc_{0}".format(i),
-							mu=hyper_alpha[i][0],
-							sigma=hyper_alpha[i][1]) for i in range(3) ]
-
-				#--------- Join variables --------------
-				loc = pm.math.stack(location,axis=1)
-
-			else:
-				loc = parameters["location"]
-			#------------------------------------------------------
-
-			#---------- Covariance matrix ------------------------------------
-			if parameters["scale"] is None:
-				chol, corr, stds = pm.LKJCholeskyCov("scl", n=3, eta=hyper_eta, 
-						sd_dist=pm.Gamma.dist(alpha=2.0,beta=1.0/hyper_beta),
-						compute_corr=True)
-			else:
-				sys.exit("Not yet implemented.")
-			#--------------------------------------------------------------
+			sys.exit("Not yet implemented.")
 		#----------------------------------------------------------------------------
 
 		#------------ Weights -----------------------------
@@ -313,40 +293,6 @@ class Model3D(Model):
 				pm.MvNormal("source",mu=loc,chol=chol,shape=(n_sources,3))
 			else:
 				pm.Normal("offset",mu=0,sigma=1,shape=(n_sources,3))
-				pm.Deterministic("source",loc + tt.nlinalg.matrix_dot(self.offset,chol))
-
-		elif prior == "StudentT":
-			pm.Gamma("nu",alpha=hyper_nu["alpha"],beta=hyper_nu["beta"])
-			if parametrization == "central":
-				pm.MvStudentT("source",nu=self.nu,mu=loc,chol=chol,shape=(n_sources,3))
-			else:
-				pm.StudentT("offset",nu=self.nu,mu=0,sigma=1,shape=(n_sources,3))
-				pm.Deterministic("source",loc + tt.nlinalg.matrix_dot(self.offset,chol))
-
-		elif prior == "King":
-			if parameters["rt"] is None:
-				pm.Gamma("x",alpha=2.0,beta=1.0/hyper_gamma)
-				pm.Deterministic("rt",1.001+self.x)
-			else:
-				self.rt = parameters["rt"]
-
-			if parametrization == "central":
-				MvKing("source",location=loc,chol=chol,rt=self.rt,shape=(n_sources,3))
-			else:
-				MvKing("offset",location=np.zeros(3),chol=np.eye(3),rt=self.rt,shape=(n_sources,3))
-				pm.Deterministic("source",loc + tt.nlinalg.matrix_dot(self.offset,chol))
-
-		elif prior == "EFF":
-			if parameters["gamma"] is None:
-				pm.Gamma("x",alpha=2.0,beta=1.0/hyper_gamma)
-				pm.Deterministic("gamma",3.001+self.x )
-			else:
-				self.gamma = parameters["gamma"]
-
-			if parametrization == "central":
-				MvEFF("source",location=loc,chol=chol,gamma=self.gamma,shape=(n_sources,3))
-			else:
-				MvEFF("offset",location=np.zeros(3),chol=np.eye(3),gamma=self.gamma,shape=(n_sources,3))
 				pm.Deterministic("source",loc + tt.nlinalg.matrix_dot(self.offset,chol))
 
 		elif prior in ["GMM","CGMM"]:
