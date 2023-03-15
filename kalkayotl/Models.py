@@ -193,6 +193,7 @@ class Model3D(Model):
 		hyper_gamma=None,
 		hyper_delta=None,
 		hyper_eta=None,
+		hyper_tau=None,
 		hyper_nu=None,
 		field_sd=None,
 		transformation=None,
@@ -224,6 +225,10 @@ class Model3D(Model):
 		if prior in ["GMM","CGMM"]:
 			#------------- Shapes -------------------------
 			n_components = len(hyper_delta)
+			mu_tail = [hyper_alpha[0][0], pm.math.tan(hyper_tau[0]) * hyper_alpha[0][0] + hyper_tau[1], 0]
+			# hyper_alpha[0][0] -> x mean
+			# hyper_tau[0] -> alpha 
+			# hyper_tay[1] -> k 
 
 			loc  = theano.shared(np.zeros((n_components,3)))
 			chol = theano.shared(np.zeros((n_components,3,3)))
@@ -233,20 +238,40 @@ class Model3D(Model):
 			if parameters["location"] is None:
 				if prior in ["CGMM"]:
 					#----------------- Concentric prior --------------------
-					location = [ pm.Normal("loc_{0}".format(j),
-								mu=hyper_alpha[j][0],
-								sigma=hyper_alpha[j][1]) for j in range(3) ]
+					#-------------------- Center -------------------------
+					location_center = [ pm.Normal("loc_{0}".format(j),
+										mu=hyper_alpha[j][0],
+										sigma=hyper_alpha[j][1]) for j in range(3) ]
 
-					loci = pm.math.stack(location,axis=1)
+					loc0 = pm.math.stack(location_center,axis=1)
+					#-----------------------------------------------------
+					#-------------------- Tails --------------------------
+					location_tails = [ pm.Normal("loct_{0}".format(j),
+										mu=mu_tail[j],
+										sigma=hyper_alpha[j][1]) for j in range(3) ]
+
+					loci = pm.math.stack(location_tails,axis=1)
+					#-----------------------------------------------------
 
 					for i in range(n_components):
-						loc  = tt.set_subtensor(loc[i],loci)
+						if i == 0:
+							loc  = tt.set_subtensor(loc[i],loc0)	
+						else:
+							loc  = tt.set_subtensor(loc[i],loci)
 					#---------------------------------------------------------
 
 				else:
 					#----------- Non-concentric prior ----------------------------
+					mu_non_concentric_tails = theano.shared(np.zeros((3, n_components)))
+					for dim in range(3):
+						for comp in range(n_components):
+							if comp == 0:
+								mu_non_concentric_tails = tt.set_subtensor(mu_non_concentric_tails[dim][comp],[hyper_alpha[dim][0]])
+							else:
+								mu_non_concentric_tails = tt.set_subtensor(mu_non_concentric_tails[dim][comp],[mu_tail[dim]])
+
 					location = [ pm.Normal("loc_{0}".format(j),
-								mu=hyper_alpha[j][0],
+								mu=mu_non_concentric_tails[j],
 								sigma=hyper_alpha[j][1],
 								shape=n_components) for j in range(3) ]
 					
@@ -290,14 +315,6 @@ class Model3D(Model):
 		#===================== True values ============================================		
 		if prior in ["GMM","CGMM"]:
 			comps = [ pm.MvNormal.dist(mu=loc[i],chol=chol[i]) for i in range(n_components)]
-
-			#---- Sample from the mixture ----------------------------------
-			pm.Mixture("source",w=weights,comp_dists=comps,shape=(n_sources,3))
-
-		elif prior == "FGMM":
-			chol_field = np.diag(np.repeat(field_sd["position"],3))
-
-			comps = [pm.MvNormal.dist(mu=loc,chol=chol),pm.MvNormal.dist(mu=loc,chol=chol_field)]
 
 			#---- Sample from the mixture ----------------------------------
 			pm.Mixture("source",w=weights,comp_dists=comps,shape=(n_sources,3))
