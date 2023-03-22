@@ -192,8 +192,8 @@ class Model3D(Model):
 		hyper_beta=None,
 		hyper_gamma=None,
 		hyper_delta=None,
-		hyper_eta=None,
 		hyper_tau=None,
+		hyper_eta=None,
 		hyper_nu=None,
 		field_sd=None,
 		transformation=None,
@@ -225,10 +225,19 @@ class Model3D(Model):
 		if prior in ["GMM","CGMM"]:
 			#------------- Shapes -------------------------
 			n_components = len(hyper_delta)
-			mu_tail = [hyper_alpha[0][0], pm.math.tan(hyper_tau[0]) * hyper_alpha[0][0] + hyper_tau[1], 0]
-			# hyper_alpha[0][0] -> x mean
-			# hyper_tau[0] -> alpha 
-			# hyper_tay[1] -> k 
+
+			k = pm.Normal("k", 
+						  mu=hyper_tau[0],
+						  sigma=hyper_tau[1])
+			theta = pm.Normal("theta",
+							  mu=hyper_tau[2],
+							  sigma=hyper_tau[3])
+			
+			# mu_tail = [hyper_alpha[0][0], 								# x
+					   
+			# 		   #pm.Deterministic("lin_reg",						
+			# 		   					#pm.math.tan(theta) * x + k),	
+			# 		   0]												# z
 
 			loc  = theano.shared(np.zeros((n_components,3)))
 			chol = theano.shared(np.zeros((n_components,3,3)))
@@ -238,44 +247,47 @@ class Model3D(Model):
 			if parameters["location"] is None:
 				if prior in ["CGMM"]:
 					#----------------- Concentric prior --------------------
+					loc = tt.zeros((n_components, 3))
+
 					#-------------------- Center -------------------------
-					location_center = [ pm.Normal("loc_{0}".format(j),
-										mu=hyper_alpha[j][0],
-										sigma=hyper_alpha[j][1]) for j in range(3) ]
+					# location_center = [ pm.Normal("loc_{0}".format(j),
+					# 					mu=hyper_alpha[j][0],
+					# 					sigma=hyper_alpha[j][1]) for j in range(3) ]
 
-					loc0 = pm.math.stack(location_center,axis=1)
+					# loc0 = pm.math.stack(location_center,axis=1)
+					# #-----------------------------------------------------
+					# #-------------------- Tails --------------------------
+					# location_tails = [ pm.Normal("loct_{0}".format(j),
+					# 					mu=mu_tail[j],
+					# 					sigma=hyper_alpha[j][1]) for j in range(3) ]
+
+					#loci = tensor de 0
 					#-----------------------------------------------------
-					#-------------------- Tails --------------------------
-					location_tails = [ pm.Normal("loct_{0}".format(j),
-										mu=mu_tail[j],
-										sigma=hyper_alpha[j][1]) for j in range(3) ]
 
-					loci = pm.math.stack(location_tails,axis=1)
-					#-----------------------------------------------------
-
-					for i in range(n_components):
-						if i == 0:
-							loc  = tt.set_subtensor(loc[i],loc0)	
-						else:
-							loc  = tt.set_subtensor(loc[i],loci)
+					# for i in range(n_components):
+					# 	if i == 0:
+					# 		loc  = tt.set_subtensor(loc[i],loc0)	
+					# 	else:
+					# 		loc  = tt.set_subtensor(loc[i],loci)
 					#---------------------------------------------------------
 
 				else:
+					sys.exit("Not implemented yet.")
 					#----------- Non-concentric prior ----------------------------
-					mu_non_concentric_tails = theano.shared(np.zeros((3, n_components)))
-					for dim in range(3):
-						for comp in range(n_components):
-							if comp == 0:
-								mu_non_concentric_tails = tt.set_subtensor(mu_non_concentric_tails[dim][comp],[hyper_alpha[dim][0]])
-							else:
-								mu_non_concentric_tails = tt.set_subtensor(mu_non_concentric_tails[dim][comp],[mu_tail[dim]])
+					# mu_non_concentric_tails = theano.shared(np.zeros((3, n_components)))
+					# for dim in range(3):
+					# 	for comp in range(n_components):
+					# 		if comp == 0:
+					# 			mu_non_concentric_tails = tt.set_subtensor(mu_non_concentric_tails[dim][comp],hyper_alpha[dim][0])
+					# 		else:
+					# 			mu_non_concentric_tails = tt.set_subtensor(mu_non_concentric_tails[dim][comp],mu_tail[dim])
 
-					location = [ pm.Normal("loc_{0}".format(j),
-								mu=mu_non_concentric_tails[j],
-								sigma=hyper_alpha[j][1],
-								shape=n_components) for j in range(3) ]
+					# location = [ pm.Normal("loc_{0}".format(j),
+					# 			mu=mu_non_concentric_tails[j],
+					# 			sigma=hyper_alpha[j][1],
+					# 			shape=n_components) for j in range(3) ]
 					
-					loc = pm.math.stack(location,axis=1)
+					# loc = pm.math.stack(location,axis=1)
 					#---------------------------------------------------------
 				#-------------------------------------------------------------------
 			else:
@@ -285,13 +297,20 @@ class Model3D(Model):
 			#---------- Covariance matrices -----------------------------------
 			if parameters["scale"] is None:
 				for i in range(n_components):
-					choli, corri, stdsi = pm.LKJCholeskyCov("scl_{0}".format(i), 
-										n=3, eta=hyper_eta, 
-										sd_dist=pm.Gamma.dist(
-										alpha=2.0,beta=1.0/hyper_beta),
-										compute_corr=True)
+					# choli, corri, stdsi = pm.LKJCholeskyCov("scl_{0}".format(i), 
+					# 					n=3, eta=hyper_eta, 
+					# 					sd_dist=pm.Gamma.dist(
+					# 					alpha=2.0,beta=1.0/hyper_beta),
+					# 					compute_corr=True)
 				
+					
+					sd_dist = pm.Gamma("sd_{0}".format(i),alpha=2.0,beta=1.0/hyper_beta,shape=3)
+
+					# tensor like indentity, exept that the diagonal is sd_dist
+					choli = tt.eye(3) * sd_dist
+
 					chol = tt.set_subtensor(chol[i],choli)
+
 
 			else:
 				sys.exit("Not yet implemented.")
@@ -316,6 +335,7 @@ class Model3D(Model):
 		if prior in ["GMM","CGMM"]:
 			comps = [ pm.MvNormal.dist(mu=loc[i],chol=chol[i]) for i in range(n_components)]
 
+
 			#---- Sample from the mixture ----------------------------------
 			pm.Mixture("source",w=weights,comp_dists=comps,shape=(n_sources,3))
 		
@@ -324,6 +344,11 @@ class Model3D(Model):
 		#=================================================================================
 
 		#----------------------- Transformation---------------------------------------
+		# Rotation from cluster to Galactic de source
+
+		# Traslation
+		
+		# from Galactic to RaDec,Parallax,PMRA,PMDEC,VRad
 		transformed = Transformation(self.source)
 		#-----------------------------------------------------------------------------
 
