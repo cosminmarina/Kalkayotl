@@ -232,6 +232,10 @@ class Model3D(Model):
 			theta = pm.Normal("theta",
 							  mu=hyper_tau[2],
 							  sigma=hyper_tau[3])
+			x_vec = pm.Uniform("x_vec", 
+								lower=0,
+								upper=1,
+								size=3)
 			
 			# mu_tail = [hyper_alpha[0][0], 								# x
 					   
@@ -345,8 +349,10 @@ class Model3D(Model):
 
 		#----------------------- Transformation---------------------------------------
 		# Rotation from cluster to Galactic de source
+		rotated = random_unit_quaternions(self.source, x_vec)
 
 		# Traslation
+		
 		
 		# from Galactic to RaDec,Parallax,PMRA,PMDEC,VRad
 		transformed = Transformation(self.source)

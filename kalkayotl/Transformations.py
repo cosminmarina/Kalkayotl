@@ -3,6 +3,58 @@ import numpy as np
 import theano
 from theano import tensor as tt
 
+#--------------------------- Rotation from cluster to Galactic -----------------------------
+# Quaternions
+def quaternions_rotation(a,b,c,d):
+	#r = tt.zeros((3,3))
+	#r = np.zeros((3,3))
+
+	r_0 = [1 - 2*(c**2 + d**2), 2*(b*c - a*d), 2*(b*d + a*c)]
+	r_1 = [2*(b*c + a*d), 1 - 2*(b**2 + d**2), 2*(c*d - a*b)]
+	r_2 = [2*(b*d - a*c), 2*(c*d + a*b), 1 - 2*(b**2 + c**2)]
+
+	# r = tt.set_subtensor(r[0],r_0)
+	# r = tt.set_subtensor(r[1],r_1)
+	# r = tt.set_subtensor(r[2],r_2)
+
+	r = [r_0, r_1, r_2]
+
+	return r
+
+def random_unif_quaternions(xyz, x_vec, is_dot=True):
+	theta1 = 2*np.pi*x_vec[1]
+	theta2 = 2*np.pi*x_vec[2]
+	r1 = np.sqrt(1 - x_vec[0])
+	r2 = np.sqrt(x_vec[0])
+	q = quaternions_rotation(np.cos(theta2)*r2, np.sin(theta1)*r1, np.cos(theta1)*r1, np.sin(theta2)*r2)
+
+	res = q
+	if is_dot:
+		res = np.dot(q, xyz)
+	
+	return res
+
+def translation_unif_by_matrix(t_vec, tam=4):
+    eye = np.eye(tam)
+    t_vec = np.append(t_vec, 1)
+    eye[:,tam-1] = t_vec
+    return eye
+
+def translation_unif(x_vec, t_vec):
+	return x_vec + t_vec
+
+def random_uniform_transformation_by_matrix(xyz, x_vec, t_vec):
+    q = random_unif_quaternions(xyz, x_vec, is_dot=False)
+    t = translation_unif(t_vec)
+    rotated = np.dot(q, xyz)
+    return np.dot(t, np.append(rotated, 1))[:-1]
+
+def random_uniform_transformation(xyz, x_vec, t_vec):
+    q = random_unif_quaternions(xyz, x_vec, is_dot=False)
+    rotated = np.dot(q, xyz)
+    return translation_unif(rotated, t_vec)
+
+
 '''
 The following transformation have been taken from pygaia (https://github.com/agabrown/PyGaia)
 Copyright (c) 2012-2019 Anthony Brown, Gaia Data Processing and Analysis Consortium
@@ -223,6 +275,8 @@ def np_radecplx_to_galactic_xyz(a):
 	icrs_xyz = np_radecplx_to_icrs_xyz(a)
 
 	gala_xyz = np.dot(_rotationMatrixIcrsToGalactic, icrs_xyz.T).T
+
+	print(_rotationMatrixGalacticToIcrs)
 	
 	return gala_xyz
 
@@ -715,13 +769,113 @@ def test_Rotation(stars):
 	new_stars = np.array([np.rad2deg(ra),np.rad2deg(dec),plx,mua,mud,vr]).T
 	np.testing.assert_allclose(new_stars,stars, rtol=1e-5, atol=0)
 
+def show_dist_quaternions(size_val, verbose=True):
+	import pandas as pd
+	import matplotlib.pyplot as plt
+	a = np.random.random(size=(3))
+	a = a / np.linalg.norm(a)
+	print(a)
+	x_value = np.random.uniform(size=(size_val,3))
+	rotated_list = []
+	for i in range(size_val):
+		rotated = random_unif_quaternions(a, x_value[i,:])
+		rotated_list.append(rotated.T)
+	df = pd.DataFrame(rotated_list, columns=['x', 'y', 'z'])
+	count_x, _ = np.histogram(df.get('x'), bins=8)
+	mean_x = np.mean(count_x)
+	count_y, _ = np.histogram(df.get('y'), bins=8)
+	mean_y = np.mean(count_y)
+	count_z, _ = np.histogram(df.get('z'), bins=8)
+	mean_z = np.mean(count_z)
+	fig = plt.figure()
+	ax = plt.subplot(2,2,1)
+	df.get('x').hist(bins=8)
+	plt.axhline(mean_x, color='r')
+	plt.title('X dist')
+	ax = plt.subplot(2,2,2)
+	df.get('y').hist(bins=8)
+	plt.axhline(mean_y, color='r')
+	plt.title('Y dist')
+	ax = plt.subplot(2,2,3)
+	df.get('z').hist(bins=8)
+	plt.axhline(mean_z, color='r')
+	plt.title('Z dist')
+	if verbose:
+		plt.show()
+	print(f'X mean: {mean_x}, X std: {np.std(count_x)}\n')
+	print(f'Y mean: {mean_y}, Y std: {np.std(count_y)}\n')
+	print(f'Z mean: {mean_z}, Z std: {np.std(count_z)}\n')
+
+def test_unif_rotation(size_val):
+	a = np.random.random(size=(3))
+	a = a / np.linalg.norm(a)
+	print("======== Testing Uniform Random Rotation ===============")
+	x_value = np.random.uniform(size=(size_val,3))
+	rotated_list = []
+	for i in range(size_val):
+		rotated = random_unif_quaternions(a, x_value[i,:])
+		rotated_list.append(rotated.T)
+	rotated_list = np.array(rotated_list)
+	print("---------------------- X Coord -------------------------")
+	count_x, _ = np.histogram(rotated_list[:,0], bins=8)
+	mean_x = np.mean(count_x)
+	std_x = np.std(count_x)
+	
+	np.testing.assert_(std_x < (mean_x * 0.06), msg='Fail at X coord')
+	print("                          OK                            ")
+	print("--------------------------------------------------------")
+
+	print("---------------------- Y Coord -------------------------")
+	count_y, _ = np.histogram(rotated_list[:,1], bins=8)
+	mean_y = np.mean(count_y)
+	std_y = np.std(count_y)
+
+	np.testing.assert_(std_y < (mean_y * 0.06), msg='Fail at Y coord')
+	print("                          OK                            ")
+	print("--------------------------------------------------------")
+
+	print("---------------------- Z Coord -------------------------")
+	count_z, _ = np.histogram(rotated_list[:,2], bins=8)
+	mean_z = np.mean(count_z)
+	std_z = np.std(count_z)
+
+	np.testing.assert_(std_z < (mean_z * 0.06), msg='Fail at Z coord')
+	print("                          OK                            ")
+	print("--------------------------------------------------------")
+
+	print("========================================================")
+	
+def test_rotaton_produce_unit_vec(size_val):
+	a = np.random.random(size=(3))
+	a = a / np.linalg.norm(a)
+	print("===== Testing Unitary Vector after Rotation ============")
+	x_value = np.random.uniform(size=(size_val,3))
+	rotated_list = []
+	for i in range(size_val):
+		rotated = random_unif_quaternions(a, x_value[i,:])
+		rotated_list.append(rotated.T)
+	rotated_list = np.array(rotated_list)
+	norm_of_rotated = np.linalg.norm(rotated_list, axis=1)
+	np.testing.assert_allclose(norm_of_rotated.sum(), size_val, rtol=1e-5, atol=0, err_msg='Vectors produced by Uniform Random Rotation are not Unitary')
+	print("--------------------------------------------------------")
+	print("                          OK                            ")
+	print("--------------------------------------------------------")
+
+	print("========================================================")
+
 
 if __name__ == "__main__":
 	stars = np.array([
 		               [68.98016279,16.50930235,48.94,63.45,-188.94,54.398],   # Aldebaran
 		               [297.69582730,+08.86832120,194.95,536.23,385.29,-26.60] # Altair
 		               ])
-	test_Rotation(stars)
-	test_3D(stars)
-	test_6D(stars)
+	#test_Rotation(stars)
+	#test_3D(stars)
+	#test_6D(stars)
+	#rotated = random_unif_quaternions(stars[:,:3].T, np.array([0.2, 0.1, 0.1]))
+	#print('Sol:',rotated[0])
+	#print('Q: ',np.array(rotated[1]))
+	show_dist_quaternions(8*600, verbose=True)
+	test_unif_rotation(8*600)
+	test_rotaton_produce_unit_vec(8*600)
 
