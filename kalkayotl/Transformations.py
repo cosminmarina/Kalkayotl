@@ -806,7 +806,8 @@ def show_dist_quaternions(size_val, verbose=True):
 	print(f'Y mean: {mean_y}, Y std: {np.std(count_y)}\n')
 	print(f'Z mean: {mean_z}, Z std: {np.std(count_z)}\n')
 
-def test_unif_rotation(size_val):
+def test_unif_rotation(size_val, confidence):
+	from scipy import stats
 	a = np.random.random(size=(3))
 	a = a / np.linalg.norm(a)
 	print("======== Testing Uniform Random Rotation ===============")
@@ -817,29 +818,35 @@ def test_unif_rotation(size_val):
 		rotated_list.append(rotated.T)
 	rotated_list = np.array(rotated_list)
 	print("---------------------- X Coord -------------------------")
-	count_x, _ = np.histogram(rotated_list[:,0], bins=8)
-	mean_x = np.mean(count_x)
-	std_x = np.std(count_x)
-	
-	np.testing.assert_(std_x < (mean_x * 0.06), msg='Fail at X coord')
+	# count_x, _ = np.histogram(rotated_list[:,0], bins=8)
+	# mean_x = np.mean(count_x)
+	# std_x = np.std(count_x)
+	#np.testing.assert_(std_x < (mean_x * 0.06), msg='Fail at X coord')
+
+	ks_test_x = stats.kstest(rotated_list[:,0], stats.uniform(loc=-1, scale=2).cdf)
+	np.testing.assert_(ks_test_x.pvalue > (1 - confidence), msg='Fail at X coord')
 	print("                          OK                            ")
 	print("--------------------------------------------------------")
 
 	print("---------------------- Y Coord -------------------------")
-	count_y, _ = np.histogram(rotated_list[:,1], bins=8)
-	mean_y = np.mean(count_y)
-	std_y = np.std(count_y)
+	# count_y, _ = np.histogram(rotated_list[:,1], bins=8)
+	# mean_y = np.mean(count_y)
+	# std_y = np.std(count_y)
+	# np.testing.assert_(std_y < (mean_y * 0.06), msg='Fail at Y coord')
 
-	np.testing.assert_(std_y < (mean_y * 0.06), msg='Fail at Y coord')
+	ks_test_y = stats.kstest(rotated_list[:,1], stats.uniform(loc=-1, scale=2).cdf)
+	np.testing.assert_(ks_test_y.pvalue > (1 - confidence), msg='Fail at Y coord')
 	print("                          OK                            ")
 	print("--------------------------------------------------------")
 
 	print("---------------------- Z Coord -------------------------")
-	count_z, _ = np.histogram(rotated_list[:,2], bins=8)
-	mean_z = np.mean(count_z)
-	std_z = np.std(count_z)
+	# count_z, _ = np.histogram(rotated_list[:,2], bins=8)
+	# mean_z = np.mean(count_z)
+	# std_z = np.std(count_z)
+	# np.testing.assert_(std_z < (mean_z * 0.06), msg='Fail at Z coord')
 
-	np.testing.assert_(std_z < (mean_z * 0.06), msg='Fail at Z coord')
+	ks_test_z = stats.kstest(rotated_list[:,1], stats.uniform(loc=-1, scale=2).cdf)
+	np.testing.assert_(ks_test_z.pvalue > (1 - confidence), msg='Fail at Y coord')
 	print("                          OK                            ")
 	print("--------------------------------------------------------")
 
@@ -876,6 +883,6 @@ if __name__ == "__main__":
 	#print('Sol:',rotated[0])
 	#print('Q: ',np.array(rotated[1]))
 	show_dist_quaternions(8*600, verbose=True)
-	test_unif_rotation(8*600)
+	test_unif_rotation(8*600, 0.95)
 	test_rotaton_produce_unit_vec(8*600)
 
