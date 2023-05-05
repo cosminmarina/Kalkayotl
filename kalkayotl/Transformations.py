@@ -5,7 +5,7 @@ from theano import tensor as tt
 
 #--------------------------- Rotation from cluster to Galactic -----------------------------
 # Quaternions
-def quaternions_rotation(a,b,c,d):
+def np_quaternions_rotation_matrix(a,b,c,d):
 	#r = tt.zeros((3,3))
 	#r = np.zeros((3,3))
 
@@ -17,16 +17,16 @@ def quaternions_rotation(a,b,c,d):
 	# r = tt.set_subtensor(r[1],r_1)
 	# r = tt.set_subtensor(r[2],r_2)
 
-	r = [r_0, r_1, r_2]
+	r = np.array([r_0, r_1, r_2])
 
-	return r
+	return tt.shared(r)
 
-def random_unif_quaternions(xyz, x_vec, is_dot=True):
-	theta1 = 2*np.pi*x_vec[1]
-	theta2 = 2*np.pi*x_vec[2]
-	r1 = np.sqrt(1 - x_vec[0])
-	r2 = np.sqrt(x_vec[0])
-	q = quaternions_rotation(np.cos(theta2)*r2, np.sin(theta1)*r1, np.cos(theta1)*r1, np.sin(theta2)*r2)
+def np_random_uniform_rotation_cluster_to_galactic(xyz, perezsala_parameters, is_dot=True):
+	theta1 = 2*np.pi*perezsala_parameters[1]
+	theta2 = 2*np.pi*perezsala_parameters[2]
+	r1 = np.sqrt(1 - perezsala_parameters[0])
+	r2 = np.sqrt(perezsala_parameters[0])
+	q = np_quaternions_rotation_matrix(np.cos(theta2)*r2, np.sin(theta1)*r1, np.cos(theta1)*r1, np.sin(theta2)*r2)
 
 	res = q
 	if is_dot:
@@ -34,25 +34,56 @@ def random_unif_quaternions(xyz, x_vec, is_dot=True):
 	
 	return res
 
-def translation_unif_by_matrix(t_vec, tam=4):
+def np_translation_cluster_to_galactic_by_matrix(loc_galactic, tam=4):
     eye = np.eye(tam)
-    t_vec = np.append(t_vec, 1)
-    eye[:,tam-1] = t_vec
+    loc_galactic = np.append(loc_galactic, 1)
+    eye[:,tam-1] = loc_galactic
     return eye
 
-def translation_unif(x_vec, t_vec):
-	return x_vec + t_vec
+def np_translation_cluster_to_galactic(perezsala_parameters, loc_galactic):
+	return perezsala_parameters + loc_galactic
 
-def random_uniform_transformation_by_matrix(xyz, x_vec, t_vec):
-    q = random_unif_quaternions(xyz, x_vec, is_dot=False)
-    t = translation_unif(t_vec)
+def np_cluster_to_galactic_by_matrix(xyz, perezsala_parameters, loc_galactic):
+    q = np_random_uniform_rotation_cluster_to_galactic(xyz, perezsala_parameters, is_dot=False)
+    t = np_translation_cluster_to_galactic(loc_galactic)
     rotated = np.dot(q, xyz)
     return np.dot(t, np.append(rotated, 1))[:-1]
 
-def random_uniform_transformation(xyz, x_vec, t_vec):
-    q = random_unif_quaternions(xyz, x_vec, is_dot=False)
+def np_cluster_to_galactic(xyz, perezsala_parameters, loc_galactic):
+    q = np_random_uniform_rotation_cluster_to_galactic(xyz, perezsala_parameters, is_dot=False)
     rotated = np.dot(q, xyz)
-    return translation_unif(rotated, t_vec)
+    return np_translation_cluster_to_galactic(rotated, loc_galactic)
+
+
+def quaternions_rotation_matrix(a,b,c,d):
+	r = tt.zeros((3,3))
+
+	r_0 = [1 - 2*(c**2 + d**2), 2*(b*c - a*d), 2*(b*d + a*c)]
+	r_1 = [2*(b*c + a*d), 1 - 2*(b**2 + d**2), 2*(c*d - a*b)]
+	r_2 = [2*(b*d - a*c), 2*(c*d + a*b), 1 - 2*(b**2 + c**2)]
+
+	r = tt.set_subtensor(r[0],r_0)
+	r = tt.set_subtensor(r[1],r_1)
+	r = tt.set_subtensor(r[2],r_2)
+
+	return r
+
+def random_uniform_rotation_cluster_to_galactic(xyz, perezsala_parameters, is_dot=True):
+	theta1 = 2*np.pi*perezsala_parameters[1]
+	theta2 = 2*np.pi*perezsala_parameters[2]
+	r1 = tt.sqrt(1 - perezsala_parameters[0])
+	r2 = tt.sqrt(perezsala_parameters[0])
+	q = quaternions_rotation_matrix(tt.cos(theta2)*r2, tt.sin(theta1)*r1, tt.cos(theta1)*r1, tt.sin(theta2)*r2)
+	
+	return tt.dot(q, xyz)
+
+def translation_cluster_to_galactic(perezsala_parameters, loc_galactic):
+	return perezsala_parameters + loc_galactic
+
+def cluster_to_galactic(xyz, perezsala_parameters, loc_galactic):
+    q = random_uniform_rotation_cluster_to_galactic(xyz, perezsala_parameters, is_dot=False)
+    rotated = tt.dot(q, xyz)
+    return translation_cluster_to_galactic(rotated, loc_galactic)
 
 
 '''
@@ -778,7 +809,7 @@ def show_dist_quaternions(size_val, verbose=True):
 	x_value = np.random.uniform(size=(size_val,3))
 	rotated_list = []
 	for i in range(size_val):
-		rotated = random_unif_quaternions(a, x_value[i,:])
+		rotated = np_random_uniform_rotation_cluster_to_galactic(a, x_value[i,:])
 		rotated_list.append(rotated.T)
 	df = pd.DataFrame(rotated_list, columns=['x', 'y', 'z'])
 	count_x, _ = np.histogram(df.get('x'), bins=8)
@@ -814,7 +845,7 @@ def test_unif_rotation(size_val, confidence):
 	x_value = np.random.uniform(size=(size_val,3))
 	rotated_list = []
 	for i in range(size_val):
-		rotated = random_unif_quaternions(a, x_value[i,:])
+		rotated = np_random_uniform_rotation_cluster_to_galactic(a, x_value[i,:])
 		rotated_list.append(rotated.T)
 	rotated_list = np.array(rotated_list)
 	print("---------------------- X Coord -------------------------")
@@ -852,18 +883,18 @@ def test_unif_rotation(size_val, confidence):
 
 	print("========================================================")
 	
-def test_rotaton_produce_unit_vec(size_val):
+def test_rotaton_norm(size_val):
 	a = np.random.random(size=(3))
-	a = a / np.linalg.norm(a)
+	norm_a = np.linalg.norm(a)
 	print("===== Testing Unitary Vector after Rotation ============")
 	x_value = np.random.uniform(size=(size_val,3))
 	rotated_list = []
 	for i in range(size_val):
-		rotated = random_unif_quaternions(a, x_value[i,:])
+		rotated = np_random_uniform_rotation_cluster_to_galactic(a, x_value[i,:])
 		rotated_list.append(rotated.T)
 	rotated_list = np.array(rotated_list)
 	norm_of_rotated = np.linalg.norm(rotated_list, axis=1)
-	np.testing.assert_allclose(norm_of_rotated.sum(), size_val, rtol=1e-5, atol=0, err_msg='Vectors produced by Uniform Random Rotation are not Unitary')
+	np.testing.assert_allclose(norm_of_rotated.sum(), size_val*norm_a, rtol=1e-5, atol=0, err_msg='Vectors produced by Uniform Random Rotation are not Unitary')
 	print("--------------------------------------------------------")
 	print("                          OK                            ")
 	print("--------------------------------------------------------")
@@ -879,10 +910,10 @@ if __name__ == "__main__":
 	#test_Rotation(stars)
 	#test_3D(stars)
 	#test_6D(stars)
-	#rotated = random_unif_quaternions(stars[:,:3].T, np.array([0.2, 0.1, 0.1]))
+	#rotated = np_random_uniform_rotation_cluster_to_galactic(stars[:,:3].T, np.array([0.2, 0.1, 0.1]))
 	#print('Sol:',rotated[0])
 	#print('Q: ',np.array(rotated[1]))
 	show_dist_quaternions(8*600, verbose=True)
 	test_unif_rotation(8*600, 0.95)
-	test_rotaton_produce_unit_vec(8*600)
+	test_rotaton_norm(8*600)
 

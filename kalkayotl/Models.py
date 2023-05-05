@@ -232,11 +232,11 @@ class Model3D(Model):
 			theta = pm.Normal("theta",
 							  mu=hyper_tau[2],
 							  sigma=hyper_tau[3])
-			x_vec = pm.Uniform("x_vec", 
-								lower=0,
-								upper=1,
-								size=3)
-			
+			perezsala_parameters = pm.Uniform("perezsala_parameters",
+                                     lower=0,
+                                     upper=1,
+                                     size=3)
+
 			# mu_tail = [hyper_alpha[0][0], 								# x
 					   
 			# 		   #pm.Deterministic("lin_reg",						
@@ -251,19 +251,16 @@ class Model3D(Model):
 			if parameters["location"] is None:
 				if prior in ["CGMM"]:
 					#----------------- Concentric prior --------------------
-					loc = tt.zeros((n_components, 3))
+					loc_in_cluster = tt.zeros((n_components, 3))
 
-					#-------------------- Center -------------------------
-					# location_center = [ pm.Normal("loc_{0}".format(j),
-					# 					mu=hyper_alpha[j][0],
-					# 					sigma=hyper_alpha[j][1]) for j in range(3) ]
+					location = [ pm.Normal("loc_{0}".format(j),
+								mu=hyper_alpha[j][0],
+								sigma=hyper_alpha[j][1]) for j in range(3) ]
 
-					# loc0 = pm.math.stack(location_center,axis=1)
-					# #-----------------------------------------------------
-					# #-------------------- Tails --------------------------
-					# location_tails = [ pm.Normal("loct_{0}".format(j),
-					# 					mu=mu_tail[j],
-					# 					sigma=hyper_alpha[j][1]) for j in range(3) ]
+					loci = pm.math.stack(location,axis=1)
+
+					for i in range(n_components):
+						loc  = tt.set_subtensor(loc[i],loci)
 
 					#loci = tensor de 0
 					#-----------------------------------------------------
@@ -337,7 +334,7 @@ class Model3D(Model):
 
 		#===================== True values ============================================		
 		if prior in ["GMM","CGMM"]:
-			comps = [ pm.MvNormal.dist(mu=loc[i],chol=chol[i]) for i in range(n_components)]
+			comps = [ pm.MvNormal.dist(mu=loc_in_cluster[i],chol=chol[i]) for i in range(n_components)]
 
 
 			#---- Sample from the mixture ----------------------------------
@@ -348,14 +345,11 @@ class Model3D(Model):
 		#=================================================================================
 
 		#----------------------- Transformation---------------------------------------
-		# Rotation from cluster to Galactic de source
-		rotated = random_unit_quaternions(self.source, x_vec)
-
-		# Traslation
-		
+		# Transformation from cluster to Galactic de source
+		transformed_to_galactic = cluster_to_galactic(self.source, perezsala_parameters, tt.diag(loc))
 		
 		# from Galactic to RaDec,Parallax,PMRA,PMDEC,VRad
-		transformed = Transformation(self.source)
+		transformed = Transformation(transformed_to_galactic)
 		#-----------------------------------------------------------------------------
 
 		#------------ Flatten --------------------------------------------------------
