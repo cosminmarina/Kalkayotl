@@ -17,9 +17,9 @@ def np_quaternions_rotation_matrix(a,b,c,d):
 	# r = tt.set_subtensor(r[1],r_1)
 	# r = tt.set_subtensor(r[2],r_2)
 
-	r = np.array([r_0, r_1, r_2])
+	r = [r_0, r_1, r_2]
 
-	return tt.shared(r)
+	return r
 
 def np_random_uniform_rotation_cluster_to_galactic(xyz, perezsala_parameters, is_dot=True):
 	theta1 = 2*np.pi*perezsala_parameters[1]
@@ -886,7 +886,7 @@ def test_unif_rotation(size_val, confidence):
 def test_rotaton_norm(size_val):
 	a = np.random.random(size=(3))
 	norm_a = np.linalg.norm(a)
-	print("===== Testing Unitary Vector after Rotation ============")
+	print("==== Testing Same Norm Vector after Rotation ===========")
 	x_value = np.random.uniform(size=(size_val,3))
 	rotated_list = []
 	for i in range(size_val):
@@ -900,6 +900,33 @@ def test_rotaton_norm(size_val):
 	print("--------------------------------------------------------")
 
 	print("========================================================")
+	
+
+def test_unif_tt(verbose=True):
+	print("== Testing Uniform Random Rotation with Theano =========")
+	a = np.random.random(size=(3))
+	a = a / np.linalg.norm(a)
+	if verbose:
+		print('A: ',a)
+	x_value = np.random.uniform(size=(3))
+	rotated = np_random_uniform_rotation_cluster_to_galactic(a, x_value)
+	if verbose:
+		print('Rotated: ',rotated)
+	
+	a_tt = tt.vector()
+	x_value_tt = tt.vector()
+	f = theano.function([a_tt, x_value_tt], random_uniform_rotation_cluster_to_galactic(a_tt, x_value_tt))
+	rotated_tt = f(a, x_value)
+	if verbose:
+		print('Rotated tt: ',rotated_tt)
+
+	np.testing.assert_allclose(rotated, rotated_tt, rtol=1e-10, atol=0, err_msg='Not the same vector')
+	print("--------------------------------------------------------")
+	print("                          OK                            ")
+	print("--------------------------------------------------------")
+
+	print("========================================================")
+	
 
 
 if __name__ == "__main__":
@@ -916,4 +943,5 @@ if __name__ == "__main__":
 	show_dist_quaternions(8*600, verbose=True)
 	test_unif_rotation(8*600, 0.95)
 	test_rotaton_norm(8*600)
+	test_unif_tt(False)
 
