@@ -26,16 +26,16 @@ import numpy as np
 import h5py
 
 #----- Import the module -------------------------------
-dir_kalkayotl  = "/home/jolivares/Repos/Kalkayotl/" 
+dir_kalkayotl  = "/home/minu99/Documentos/GitHub/Kalkayotl/" 
 sys.path.append(dir_kalkayotl)
 from kalkayotl.inference import Inference
 #-------------------------------------------------------
 
 #============ Directory and data ===========================================
-dir_base = "/home/jolivares/Repos/Kalkayotl/article/v2.0/ComaBer/Core/"
+dir_base = "/home/minu99/Documentos/GitHub/Kalkayotl/article/v2.0/ComaBer/Core/"
 
 #----------- Data file -----------------------------------------------------
-file_data = dir_base + "members+rvs.csv"
+file_data = dir_base + "members+rvs_sample.csv"
 file_parameters = None
 #----------------------------------------------------------------------------
 
@@ -46,7 +46,7 @@ os.makedirs(dir_base,exist_ok=True)
 
 
 #=============== Tuning knobs ============================
-dimension = 6
+dimension = 3
 #----------------- Chains-----------------------------------------------------
 # The number of parallel chains you want to run. Two are the minimum required
 # to analyse convergence.
@@ -124,20 +124,20 @@ indep_measures = False
 
 #========================= PRIORS ===========================================
 list_of_prior = [
-	{"type":"Gaussian",
-		"dimension":dimension,
-		"zero_point":zero_point[:dimension],
-		"parameters":{"location":None,"scale":None},
-		"hyper_parameters":{
-							"alpha":None,
-							"beta":None,
-							"gamma":None,
-							"delta":None,
-							"eta":None
-							},
-		"field_sd":None,
-		"parametrization":"central",
-		"velocity_model":"joint"},
+	# {"type":"Gaussian",
+	# 	"dimension":dimension,
+	# 	"zero_point":zero_point[:dimension],
+	# 	"parameters":{"location":None,"scale":None},
+	# 	"hyper_parameters":{
+	# 						"alpha":None,
+	# 						"beta":None,
+	# 						"gamma":None,
+	# 						"delta":None,
+	# 						"eta":None
+	# 						},
+	# 	"field_sd":None,
+	# 	"parametrization":"central",
+	# 	"velocity_model":"joint"},
 	# {"type":"StudentT",
 	# 	"dimension":dimension,
 	# 	"zero_point":zero_point[:dimension],
@@ -167,23 +167,23 @@ list_of_prior = [
 	# 	"field_sd":{"position":50.0,"velocity":10.0},
 	# 	"parametrization":"central",
 	#   "velocity_model":"independent"},
-	# {"type":"CGMM",
-	# 	"dimension":dimension,
-	# 	"zero_point":zero_point[:dimension],        
-	# 	"parameters":{"location":None,
-	# 				  "scale":None,
-	# 				  "weights":None},
-	# 	"hyper_parameters":{
-	# 						"alpha":None,
-	# 						"beta":None, 
-	# 						"gamma":None,
-	# 						"delta":np.repeat(2,2),
-	# 						"eta":None,
-	# 						"n_components":2
-	# 						},
-	# 	"field_sd":None,
-	# 	"parametrization":"central",
-	# 	"velocity_model":"joint"},
+	{"type":"CGMM",
+		"dimension":dimension,
+		"zero_point":zero_point[:dimension],        
+		"parameters":{"location":None,
+					  "scale":None,
+					  "weights":None},
+		"hyper_parameters":{
+							"alpha":None,
+							"beta":None, 
+							"gamma":None,
+							"delta":np.repeat(2,2),
+							"eta":None,
+							"n_components":2
+							},
+		"field_sd":None,
+		"parametrization":"central",
+		"velocity_model":"joint"},
 
 	# {"type":"GMM",
 	# 	"dimension":dimension,
@@ -242,11 +242,12 @@ for prior in list_of_prior:
 
 	#============ Sampling with HMC ======================================
 	#------- Run the sampler ---------------------
-	p3d.run(sample_iters=sample_iters,
-			tuning_iters=tuning_iters,
-			target_accept=target_accept,
-			chains=chains,
-			cores=cores)
+	# p3d.run(sample_iters=sample_iters,
+	# 		init_iters=int(1e2),
+	# 		tuning_iters=tuning_iters,
+	# 		target_accept=target_accept,
+	# 		chains=chains,
+	# 		cores=cores)
 	#-------------------------------------
 
 	# -------- Load the chains --------------------------------

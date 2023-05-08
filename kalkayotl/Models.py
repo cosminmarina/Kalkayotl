@@ -27,6 +27,7 @@ from kalkayotl.Transformations import Iden,pc2mas # 1D
 from kalkayotl.Transformations import icrs_xyz_to_radecplx,galactic_xyz_to_radecplx #3D
 from kalkayotl.Transformations import icrs_xyzuvw_to_astrometry_and_rv
 from kalkayotl.Transformations import galactic_xyzuvw_to_astrometry_and_rv #6D
+from kalkayotl.Transformations import cluster_to_galactic # Rotation + Translation
 from kalkayotl.Priors import EDSD,MvEFF #,EFF,King,MvEFF,MvKing
 
 PRINT = printing.Print('Theano shape: ', attrs=['shape'])
@@ -225,17 +226,10 @@ class Model3D(Model):
 		if prior in ["GMM","CGMM"]:
 			#------------- Shapes -------------------------
 			n_components = len(hyper_delta)
-
-			k = pm.Normal("k", 
-						  mu=hyper_tau[0],
-						  sigma=hyper_tau[1])
-			theta = pm.Normal("theta",
-							  mu=hyper_tau[2],
-							  sigma=hyper_tau[3])
 			perezsala_parameters = pm.Uniform("perezsala_parameters",
                                      lower=0,
                                      upper=1,
-                                     size=3)
+                                     shape=3)
 
 			# mu_tail = [hyper_alpha[0][0], 								# x
 					   
@@ -243,7 +237,7 @@ class Model3D(Model):
 			# 		   					#pm.math.tan(theta) * x + k),	
 			# 		   0]												# z
 
-			loc  = theano.shared(np.zeros((n_components,3)))
+			#loc  = theano.shared(np.zeros((3)))
 			chol = theano.shared(np.zeros((n_components,3,3)))
 			#----------------------------------------------
 
@@ -251,16 +245,16 @@ class Model3D(Model):
 			if parameters["location"] is None:
 				if prior in ["CGMM"]:
 					#----------------- Concentric prior --------------------
-					loc_in_cluster = tt.zeros((n_components, 3))
+					loc_in_cluster = tt.zeros((3))
 
 					location = [ pm.Normal("loc_{0}".format(j),
 								mu=hyper_alpha[j][0],
 								sigma=hyper_alpha[j][1]) for j in range(3) ]
 
-					loci = pm.math.stack(location,axis=1)
+					loc = pm.math.stack(location,axis=1)
 
-					for i in range(n_components):
-						loc  = tt.set_subtensor(loc[i],loci)
+					# for i in range(n_components):
+					# 	loc  = tt.set_subtensor(loc[i],loci)
 
 					#loci = tensor de 0
 					#-----------------------------------------------------
@@ -305,7 +299,7 @@ class Model3D(Model):
 					# 					compute_corr=True)
 				
 					
-					sd_dist = pm.Gamma("sd_{0}".format(i),alpha=2.0,beta=1.0/hyper_beta,shape=3)
+					sd_dist = pm.Gamma("stds_{0}".format(i),alpha=2.0,beta=1.0/hyper_beta,shape=3)
 
 					# tensor like indentity, exept that the diagonal is sd_dist
 					choli = tt.eye(3) * sd_dist
@@ -334,7 +328,7 @@ class Model3D(Model):
 
 		#===================== True values ============================================		
 		if prior in ["GMM","CGMM"]:
-			comps = [ pm.MvNormal.dist(mu=loc_in_cluster[i],chol=chol[i]) for i in range(n_components)]
+			comps = [ pm.MvNormal.dist(mu=loc_in_cluster,chol=chol[i]) for i in range(n_components)]
 
 
 			#---- Sample from the mixture ----------------------------------
@@ -346,7 +340,7 @@ class Model3D(Model):
 
 		#----------------------- Transformation---------------------------------------
 		# Transformation from cluster to Galactic de source
-		transformed_to_galactic = cluster_to_galactic(self.source, perezsala_parameters, tt.diag(loc))
+		transformed_to_galactic = cluster_to_galactic(self.source, perezsala_parameters, loc)
 		
 		# from Galactic to RaDec,Parallax,PMRA,PMDEC,VRad
 		transformed = Transformation(transformed_to_galactic)

@@ -679,7 +679,8 @@ class Inference:
 
 			#---------- Posterior -----------------------
 			trace = pm.sample(draws=sample_iters,
-							initvals=initvals,
+							#initvals=initvals,
+							start=initvals,
 							step=step,
 							tune=tuning_iters,
 							chains=chains, cores=cores,
@@ -733,6 +734,8 @@ class Inference:
 		#------- Variable names -----------------------------------------------------------
 		source_variables = list(filter(lambda x: "source" in x, self.ds_posterior.data_vars))
 		cluster_variables = list(filter(lambda x: ( ("loc" in x) 
+											or ("stds" in x)
+											or ("perezsala_parameters" in x)
 											or ("scl" in x) 
 											or ("weights" in x)
 											or ("beta" in x)
@@ -1071,7 +1074,8 @@ class Inference:
 			amps = amps[:,chain].reshape((ng,ns))
 			locs = locs[:,chain].reshape((ng,ns,nd))
 			stds = stds[:,chain].reshape((ng,ns,nd))
-			cors = cors[:,chain].reshape((ng,ns,nd,nd))
+			cors = np.zeros((ng,ns,nd,nd))
+			#cors = cors[:,chain].reshape((ng,ns,nd,nd))
 			#--------------------------------------------
 		#-------------------------------------------
 

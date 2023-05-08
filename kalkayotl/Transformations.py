@@ -68,21 +68,20 @@ def quaternions_rotation_matrix(a,b,c,d):
 
 	return r
 
-def random_uniform_rotation_cluster_to_galactic(xyz, perezsala_parameters, is_dot=True):
+def random_uniform_rotation_cluster_to_galactic(xyz, perezsala_parameters):
 	theta1 = 2*np.pi*perezsala_parameters[1]
 	theta2 = 2*np.pi*perezsala_parameters[2]
 	r1 = tt.sqrt(1 - perezsala_parameters[0])
 	r2 = tt.sqrt(perezsala_parameters[0])
 	q = quaternions_rotation_matrix(tt.cos(theta2)*r2, tt.sin(theta1)*r1, tt.cos(theta1)*r1, tt.sin(theta2)*r2)
 	
-	return tt.dot(q, xyz)
+	return tt.dot(xyz, q)
 
-def translation_cluster_to_galactic(perezsala_parameters, loc_galactic):
-	return perezsala_parameters + loc_galactic
+def translation_cluster_to_galactic(xyz, loc_galactic):
+	return xyz + loc_galactic
 
 def cluster_to_galactic(xyz, perezsala_parameters, loc_galactic):
-    q = random_uniform_rotation_cluster_to_galactic(xyz, perezsala_parameters, is_dot=False)
-    rotated = tt.dot(q, xyz)
+    rotated = random_uniform_rotation_cluster_to_galactic(xyz, perezsala_parameters)
     return translation_cluster_to_galactic(rotated, loc_galactic)
 
 
