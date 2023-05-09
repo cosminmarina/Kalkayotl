@@ -26,13 +26,13 @@ import numpy as np
 import h5py
 
 #----- Import the module -------------------------------
-dir_kalkayotl  = "/home/minu99/Documentos/GitHub/Kalkayotl/" 
+dir_kalkayotl  = "/home/simul3/Documentos/Cosmin/Kalkayotl/" 
 sys.path.append(dir_kalkayotl)
 from kalkayotl.inference import Inference
 #-------------------------------------------------------
 
 #============ Directory and data ===========================================
-dir_base = "/home/minu99/Documentos/GitHub/Kalkayotl/article/v2.0/ComaBer/Core/"
+dir_base = "/home/simul3/Documentos/Cosmin/Kalkayotl/article/v2.0/ComaBer/Core/"
 
 #----------- Data file -----------------------------------------------------
 file_data = dir_base + "members+rvs_sample.csv"
@@ -242,12 +242,12 @@ for prior in list_of_prior:
 
 	#============ Sampling with HMC ======================================
 	#------- Run the sampler ---------------------
-	# p3d.run(sample_iters=sample_iters,
-	# 		init_iters=int(1e2),
-	# 		tuning_iters=tuning_iters,
-	# 		target_accept=target_accept,
-	# 		chains=chains,
-	# 		cores=cores)
+	p3d.run(sample_iters=sample_iters,
+			init_iters=int(1e7),
+			tuning_iters=tuning_iters,
+			target_accept=target_accept,
+			chains=chains,
+			cores=cores)
 	#-------------------------------------
 
 	# -------- Load the chains --------------------------------

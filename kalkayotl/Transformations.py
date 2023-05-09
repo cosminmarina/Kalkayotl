@@ -30,7 +30,7 @@ def np_random_uniform_rotation_cluster_to_galactic(xyz, perezsala_parameters, is
 
 	res = q
 	if is_dot:
-		res = np.dot(q, xyz)
+		res = np.dot(xyz, q)
 	
 	return res
 
@@ -51,7 +51,7 @@ def np_cluster_to_galactic_by_matrix(xyz, perezsala_parameters, loc_galactic):
 
 def np_cluster_to_galactic(xyz, perezsala_parameters, loc_galactic):
     q = np_random_uniform_rotation_cluster_to_galactic(xyz, perezsala_parameters, is_dot=False)
-    rotated = np.dot(q, xyz)
+    rotated = np.dot(xyz, q)
     return np_translation_cluster_to_galactic(rotated, loc_galactic)
 
 
@@ -83,6 +83,48 @@ def translation_cluster_to_galactic(xyz, loc_galactic):
 def cluster_to_galactic(xyz, perezsala_parameters, loc_galactic):
     rotated = random_uniform_rotation_cluster_to_galactic(xyz, perezsala_parameters)
     return translation_cluster_to_galactic(rotated, loc_galactic)
+
+
+#-------------------------- PerezSala Parameters to Euler Angles ---------------------------
+
+def np_perezsala_to_eulerangles(perezsala_parameters):
+	theta1 = 2*np.pi*perezsala_parameters[1]
+	theta2 = 2*np.pi*perezsala_parameters[2]
+	r1 = np.sqrt(1 - perezsala_parameters[0])
+	r2 = np.sqrt(perezsala_parameters[0])
+	qw = np.cos(theta2)*r2
+	qx = np.sin(theta1)*r1
+	qy = np.cos(theta1)*r1
+	qz = np.sin(theta2)*r2
+
+	eulerangles_x = np.arctan2(2*(qw*qx + qy*qz),1-2*(qx**2 + qy**2))
+	#eulerangles_y = -np.pi/2 + 2*np.arctan2(np.sqrt(1 + 2*(qw*qy - qx*qz)), np.sqrt(1 - 2*(qw*qy - qx*qz)))
+	eulerangles_y = np.arcsin(2*(qw*qy - qx*qz))
+	eulerangles_z = np.arctan2(2*(qw*qz + qx*qy), 1-2*(qy**2 + qz**2))
+
+	return np.array([eulerangles_x, eulerangles_y, eulerangles_z])
+	
+def perezsala_to_eulerangles(perezsala_parameters):
+	eulerangles = tt.zeros((3))
+
+	theta1 = 2*np.pi*perezsala_parameters[1]
+	theta2 = 2*np.pi*perezsala_parameters[2]
+	r1 = tt.sqrt(1 - perezsala_parameters[0])
+	r2 = tt.sqrt(perezsala_parameters[0])
+	qw = tt.cos(theta2)*r2
+	qx = tt.sin(theta1)*r1
+	qy = tt.cos(theta1)*r1
+	qz = tt.sin(theta2)*r2
+
+	eulerangles_0 = tt.arctan2(2*(qw*qx + qy*qz),1-2*(qx**2 + qy**2))
+	eulerangles_1 = tt.arcsin(2*(qw*qy - qx*qz))
+	eulerangles_2 = tt.arctan2(2*(qw*qz + qx*qy), 1-2*(qy**2 + qz**2))
+
+	eulerangles = tt.set_subtensor(eulerangles[0],eulerangles_0)
+	eulerangles = tt.set_subtensor(eulerangles[1],eulerangles_1)
+	eulerangles = tt.set_subtensor(eulerangles[2],eulerangles_2)
+
+	return eulerangles
 
 
 '''
@@ -805,10 +847,10 @@ def show_dist_quaternions(size_val, verbose=True):
 	a = np.random.random(size=(3))
 	a = a / np.linalg.norm(a)
 	print(a)
-	x_value = np.random.uniform(size=(size_val,3))
+	perezsala_parameters = np.random.uniform(size=(size_val,3))
 	rotated_list = []
 	for i in range(size_val):
-		rotated = np_random_uniform_rotation_cluster_to_galactic(a, x_value[i,:])
+		rotated = np_random_uniform_rotation_cluster_to_galactic(a, perezsala_parameters[i,:])
 		rotated_list.append(rotated.T)
 	df = pd.DataFrame(rotated_list, columns=['x', 'y', 'z'])
 	count_x, _ = np.histogram(df.get('x'), bins=8)
@@ -841,10 +883,10 @@ def test_unif_rotation(size_val, confidence):
 	a = np.random.random(size=(3))
 	a = a / np.linalg.norm(a)
 	print("======== Testing Uniform Random Rotation ===============")
-	x_value = np.random.uniform(size=(size_val,3))
+	perezsala_parameters = np.random.uniform(size=(size_val,3))
 	rotated_list = []
 	for i in range(size_val):
-		rotated = np_random_uniform_rotation_cluster_to_galactic(a, x_value[i,:])
+		rotated = np_random_uniform_rotation_cluster_to_galactic(a, perezsala_parameters[i,:])
 		rotated_list.append(rotated.T)
 	rotated_list = np.array(rotated_list)
 	print("---------------------- X Coord -------------------------")
@@ -886,10 +928,10 @@ def test_rotaton_norm(size_val):
 	a = np.random.random(size=(3))
 	norm_a = np.linalg.norm(a)
 	print("==== Testing Same Norm Vector after Rotation ===========")
-	x_value = np.random.uniform(size=(size_val,3))
+	perezsala_parameters = np.random.uniform(size=(size_val,3))
 	rotated_list = []
 	for i in range(size_val):
-		rotated = np_random_uniform_rotation_cluster_to_galactic(a, x_value[i,:])
+		rotated = np_random_uniform_rotation_cluster_to_galactic(a, perezsala_parameters[i,:])
 		rotated_list.append(rotated.T)
 	rotated_list = np.array(rotated_list)
 	norm_of_rotated = np.linalg.norm(rotated_list, axis=1)
@@ -907,15 +949,15 @@ def test_unif_tt(verbose=True):
 	a = a / np.linalg.norm(a)
 	if verbose:
 		print('A: ',a)
-	x_value = np.random.uniform(size=(3))
-	rotated = np_random_uniform_rotation_cluster_to_galactic(a, x_value)
+	perezsala_parameters = np.random.uniform(size=(3))
+	rotated = np_random_uniform_rotation_cluster_to_galactic(a, perezsala_parameters)
 	if verbose:
 		print('Rotated: ',rotated)
 	
 	a_tt = tt.vector()
-	x_value_tt = tt.vector()
-	f = theano.function([a_tt, x_value_tt], random_uniform_rotation_cluster_to_galactic(a_tt, x_value_tt))
-	rotated_tt = f(a, x_value)
+	perezsala_parameters_tt = tt.vector()
+	f = theano.function([a_tt, perezsala_parameters_tt], random_uniform_rotation_cluster_to_galactic(a_tt, perezsala_parameters_tt))
+	rotated_tt = f(a, perezsala_parameters)
 	if verbose:
 		print('Rotated tt: ',rotated_tt)
 
@@ -926,6 +968,52 @@ def test_unif_tt(verbose=True):
 
 	print("========================================================")
 	
+def test_correct_conversion_to_euler_angles_np(verbose=False):
+	print("==== Testing PerezSala Params to Euler Angles ==========")
+	perezsala_parameters = np.random.random((3))
+	if verbose:
+		print(perezsala_parameters)
+	
+	rot_mat = np_random_uniform_rotation_cluster_to_galactic([], perezsala_parameters, False)
+	rot_mat = np.array(rot_mat)
+
+	from scipy.spatial.transform import Rotation
+	r =  Rotation.from_matrix(rot_mat)
+	angles_scipy = r.as_euler("xyz", degrees=False)
+
+	angles_direct = np_perezsala_to_eulerangles(perezsala_parameters)
+	
+	if verbose:
+		print('Rotation_matrix: ',rot_mat)
+		print('Angles with scipy: ', angles_scipy)
+		print('Angles with Quaternions direct conversion: ', angles_direct)
+	
+	np.testing.assert_allclose(angles_scipy, angles_direct, rtol=1e-10, atol=0, err_msg='Not the same conversion to euler angle')
+	print("--------------------------------------------------------")
+	print("                          OK                            ")
+	print("--------------------------------------------------------")
+
+	print("========================================================")
+
+def test_conversion_to_euler_tt(verbose=False):
+	print("== Testing PerezSala to Euler Angles with Theano =======")
+	perezsala_parameters = np.random.uniform(size=(3))
+	eulerangles = np_perezsala_to_eulerangles(perezsala_parameters)
+	if verbose:
+		print('Euler angles [rad]: ', eulerangles)
+	
+	perezsala_parameters_tt = tt.vector()
+	f = theano.function([perezsala_parameters_tt], perezsala_to_eulerangles(perezsala_parameters_tt))
+	eulerangles_tt = f(perezsala_parameters)
+	if verbose:
+		print('Euler angles [rad] tt: ', eulerangles_tt)
+
+	np.testing.assert_allclose(eulerangles, eulerangles_tt, rtol=1e-10, atol=0, err_msg='Not the same conversion to euler angle')
+	print("--------------------------------------------------------")
+	print("                          OK                            ")
+	print("--------------------------------------------------------")
+
+	print("========================================================")
 
 
 if __name__ == "__main__":
@@ -940,7 +1028,9 @@ if __name__ == "__main__":
 	#print('Sol:',rotated[0])
 	#print('Q: ',np.array(rotated[1]))
 	show_dist_quaternions(8*600, verbose=True)
-	test_unif_rotation(8*600, 0.95)
+	test_unif_rotation(8*600, 0.90)
 	test_rotaton_norm(8*600)
 	test_unif_tt(False)
+	test_correct_conversion_to_euler_angles_np()
+	test_conversion_to_euler_tt()
 
