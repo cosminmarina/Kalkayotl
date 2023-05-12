@@ -60,7 +60,8 @@ cores  = 2
 # burining_iters is the number of iterations used to tune the sampler
 # These will not be used for the statistics nor the plots. 
 # If the sampler shows warnings you most probably must increase this value.
-tuning_iters = 3000
+tuning_iters = 4000 # parametros [3000, 4000]
+tuning_list = [3000, 4000]
 
 # After discarding the burning you will obtain sample_iters*chains samples
 # from the posterior distribution. These are the ones used in the plots and to
@@ -72,7 +73,9 @@ sample_iters = 3000
 # This parameter controls the acceptance of the proposed steps in the Hamiltonian
 # Monte Carlo sampler. It should be larger than 0.7-0.8. Increasing it helps in the convergence
 # of the sampler but increases the computing time.
-target_accept = 0.95
+target_accept = 0.95 # parametros [0.95, 0.90, 0.80, 0.70, 0.60]
+target_list = [0.95, 0.90, 0.80, 0.70, 0.60]
+
 #---------------------------------------------------------------------------
 
 #------------ Statistic -------------------------------------------------------
@@ -205,71 +208,76 @@ list_of_prior = [
 #======================= Inference and Analysis =====================================================
 
 #--------------------- Loop over prior types ------------------------------------
-for prior in list_of_prior:
+for prior in list_of_prior: # en vez de sobre priors, hacer lop sobre tuning_iters y target_accept
+	for tuning in tuning_list:
+		for target in target_list:
+			tuning_iters = tuning
+			target_accept = target
+			#------ Output directories for each prior -------------------
+			dir_prior = dir_base +  "{0}D_{1}_{2}_{3}_{4}_{5}_{6}_test".format(
+				dimension,
+				prior["type"],
+				reference_system,
+				prior["parametrization"],
+				prior["velocity_model"],
+				tuning_iters,
+				target_accept)
+			#------------------------------------------------------------
 
-	#------ Output directories for each prior -------------------
-	dir_prior = dir_base +  "{0}D_{1}_{2}_{3}_{4}_test".format(
-		dimension,
-		prior["type"],
-		reference_system,
-		prior["parametrization"],
-		prior["velocity_model"])
-	#------------------------------------------------------------
+			#---------- Create prior directory -------------
+			os.makedirs(dir_prior,exist_ok=True)
+			#------------------------------------------------
 
-	#---------- Create prior directory -------------
-	os.makedirs(dir_prior,exist_ok=True)
-	#------------------------------------------------
+			#--------- Initialize the inference module -------
+			p3d = Inference(dimension=prior["dimension"],
+							dir_out=dir_prior,
+							zero_point=prior["zero_point"],
+							indep_measures=indep_measures,
+							reference_system=reference_system)
 
-	#--------- Initialize the inference module -------
-	p3d = Inference(dimension=prior["dimension"],
-					dir_out=dir_prior,
-					zero_point=prior["zero_point"],
-					indep_measures=indep_measures,
-					reference_system=reference_system)
+			#-------- Load the data set --------------------
+			# It will use the Gaia column names by default.
+			p3d.load_data(file_data)
 
-	#-------- Load the data set --------------------
-	# It will use the Gaia column names by default.
-	p3d.load_data(file_data)
+			#------ Prepares the model -------------------
+			p3d.setup(prior=prior["type"],
+					parameters=prior["parameters"],
+					hyper_parameters=prior["hyper_parameters"],
+					transformation=transformation,
+					parametrization=prior["parametrization"],
+					field_sd=prior["field_sd"],
+					velocity_model=prior["velocity_model"])
 
-	#------ Prepares the model -------------------
-	p3d.setup(prior=prior["type"],
-			  parameters=prior["parameters"],
-			  hyper_parameters=prior["hyper_parameters"],
-			  transformation=transformation,
-			  parametrization=prior["parametrization"],
-			  field_sd=prior["field_sd"],
-			  velocity_model=prior["velocity_model"])
+			#============ Sampling with HMC ======================================
+			#------- Run the sampler ---------------------
+			p3d.run(sample_iters=sample_iters,
+					init_iters=int(1e7),
+					tuning_iters=tuning_iters,
+					target_accept=target_accept,
+					chains=chains,
+					cores=cores)
+			#-------------------------------------
 
-	#============ Sampling with HMC ======================================
-	#------- Run the sampler ---------------------
-	p3d.run(sample_iters=sample_iters,
-			init_iters=int(1e7),
-			tuning_iters=tuning_iters,
-			target_accept=target_accept,
-			chains=chains,
-			cores=cores)
-	#-------------------------------------
+			# -------- Load the chains --------------------------------
+			# This is useful if you have already computed the chains
+			# and want to re-analyse (in that case comment the p1d.run() line)
+			p3d.load_trace()
 
-	# -------- Load the chains --------------------------------
-	# This is useful if you have already computed the chains
-	# and want to re-analyse (in that case comment the p1d.run() line)
-	p3d.load_trace()
+			# ------- Re-analyse the convergence of the sampler---
+			p3d.convergence()
 
-	# ------- Re-analyse the convergence of the sampler---
-	p3d.convergence()
+			#-------- Plot the trace of the chains ------------------------------------
+			# If you provide the list of IDs (string list) it will plot the traces
+			# of the provided sources. If IDs keyword removed only plots the population parameters.
+			p3d.plot_chains()
 
-	#-------- Plot the trace of the chains ------------------------------------
-	# If you provide the list of IDs (string list) it will plot the traces
-	# of the provided sources. If IDs keyword removed only plots the population parameters.
-	p3d.plot_chains()
+			#------- Plot model ----------------
+			p3d.plot_model()
 
-	#------- Plot model ----------------
-	p3d.plot_model()
+			#----- Compute and save the posterior statistics ---------
+			p3d.save_statistics(hdi_prob=hdi_prob)
 
-	#----- Compute and save the posterior statistics ---------
-	p3d.save_statistics(hdi_prob=hdi_prob)
-
-	#------- Save the samples into HDF5 file --------------
-	p3d.save_samples()
+			#------- Save the samples into HDF5 file --------------
+			p3d.save_samples()
 	
 #=======================================================================================
